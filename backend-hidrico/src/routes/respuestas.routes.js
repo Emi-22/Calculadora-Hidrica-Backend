@@ -1,7 +1,7 @@
 // src/routes/respuestas.routes.js
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { protegerRuta } from '../middleware/authMiddleware.js'; // Middleware de protección de rutas
+import { protegerRuta, requerirRol } from '../middleware/authMiddleware.js'; // Protección y roles
 
 const router = Router();
 
@@ -76,3 +76,44 @@ router.post('/respuestas', protegerRuta, async (req, res) => {
 });
 
 export default router;
+
+/**
+ * Endpoint: GET /api/respuestas/estadisticas
+ * Propósito: Obtener estadísticas agregadas de respuestas (solo admin).
+ */
+router.get('/respuestas/estadisticas', protegerRuta, requerirRol('admin', 'administrador'), async (req, res) => {
+    try {
+        // Obtener estadísticas por pregunta y opción
+        const [rows] = await pool.query(`
+            SELECT 
+                p.id           AS id_pregunta,
+                p.codigo       AS codigo_pregunta,
+                p.texto        AS texto_pregunta,
+                o.id           AS id_opcion,
+                o.texto_opcion AS texto_opcion,
+                COUNT(ru.id)   AS total_respuestas
+            FROM preguntas p
+            JOIN opciones o ON o.id_pregunta = p.id
+            LEFT JOIN respuestas_usuario ru ON ru.id_opcion = o.id
+            GROUP BY p.id, o.id
+            ORDER BY p.id ASC, o.id ASC
+        `);
+
+        // Obtener conteo de usuarios únicos que completaron la encuesta
+        // Un usuario completó la encuesta si tiene al menos una respuesta
+        const [usuariosCompletaron] = await pool.query(`
+            SELECT COUNT(DISTINCT id_usuario) AS total_usuarios
+            FROM respuestas_usuario
+        `);
+
+        res.json({
+            estadisticas: rows,
+            totalUsuariosCompletaron: usuariosCompletaron[0]?.total_usuarios || 0
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Error al obtener estadísticas',
+            error: error.message
+        });
+    }
+});

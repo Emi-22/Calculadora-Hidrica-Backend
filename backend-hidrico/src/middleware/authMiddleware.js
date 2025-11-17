@@ -38,3 +38,20 @@ export const protegerRuta = (req, res, next) => {
         res.status(403).json({ message: 'Token no es válido.' });
     }
 };
+
+/**
+ * Middleware de autorización por rol.
+ * Uso: router.get('/ruta', protegerRuta, requerirRol('admin'), handler)
+ */
+export const requerirRol = (...rolesPermitidos) => {
+    return (req, res, next) => {
+        const rolUsuario = req?.usuario?.rol;
+        if (!rolUsuario) {
+            return res.status(403).json({ message: 'Acceso denegado.' });
+        }
+        if (!rolesPermitidos.includes(rolUsuario)) {
+            return res.status(403).json({ message: 'Permisos insuficientes.' });
+        }
+        next();
+    };
+};

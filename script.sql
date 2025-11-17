@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
     `nombre` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL, -- Para la contraseña hasheada con bcrypt
+    `sexo` ENUM('femenino','masculino','otro','prefiero_no_decir') NOT NULL,
+    `nivel_educativo` ENUM('primaria','secundaria','tecnico','universitario','postgrado','otro') NOT NULL,
+    `rol` ENUM('usuario','admin') NOT NULL DEFAULT 'usuario',
     `fecha_registro` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `fecha_actualizacion` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -29,6 +32,27 @@ CREATE TABLE IF NOT EXISTS usuarios (
     UNIQUE INDEX `idx_email_unique` (`email` ASC)
 ) ENGINE = InnoDB;
 
+-- -----------------------------------------------------
+-- Tabla: `password_reset_tokens`
+-- Maneja los tokens de recuperación de contraseña
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `token_hash` CHAR(64) NOT NULL,
+    `expires_at` DATETIME NOT NULL,
+    `used_at` DATETIME NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `idx_token_hash_unique` (`token_hash`),
+    INDEX `idx_user_expires` (`user_id`, `expires_at`),
+    CONSTRAINT `fk_password_reset_user`
+        FOREIGN KEY (`user_id`)
+        REFERENCES `usuarios` (`id`)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+) ENGINE = InnoDB;
 
 -- -----------------------------------------------------
 -- Tabla: `preguntas`

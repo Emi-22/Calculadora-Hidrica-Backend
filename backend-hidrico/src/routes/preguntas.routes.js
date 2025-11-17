@@ -36,10 +36,8 @@ router.get('/preguntas', async (req, res) => {
             if (preguntasMap[opcion.id_pregunta]) {
                 preguntasMap[opcion.id_pregunta].opciones.push({
                     id: opcion.id,
-                    texto: opcion.texto_opcion
-                    // NO enviamos el 'valor_consumo' al front-end.
-                    // El front-end solo necesita el 'id' de la opción que el usuario eligió.
-                    // El cálculo se hace en el backend al guardar la respuesta.
+                    texto: opcion.texto_opcion,
+                    valor_consumo: Number(opcion.valor_consumo)
                 });
             }
         });

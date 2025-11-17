@@ -9,6 +9,7 @@ import preguntasRoutes from './routes/preguntas.routes.js'; // Importamos las ru
 import authRoutes from './routes/auth.routes.js'; // Importamos las rutas de autenticación
 import respuestasRoutes from './routes/respuestas.routes.js'; // Importamos las rutas de respuestas
 import consumoRoutes from './routes/consumo.routes.js'; // Importamos las rutas de consumo
+import usuariosRoutes from './routes/usuarios.routes.js'; // Rutas de administración de usuarios
 
 
 
@@ -58,6 +59,7 @@ app.use('/api', preguntasRoutes);
 app.use('/api', authRoutes);
 app.use('/api', respuestasRoutes);
 app.use('/api', consumoRoutes);
+app.use('/api', usuariosRoutes);
 
 // --- Iniciar el Servidor ---
 app.listen(PORT, () => {
