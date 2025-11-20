@@ -1,20 +1,16 @@
 // src/db.js
-import { createPool } from 'mysql2/promise'; // Usamos la versión con promesas
+import pkg from 'pg';
+const { Pool } = pkg;
 import 'dotenv/config'; // Carga las variables de .env en process.env
 
-console.log('Loading environment variables:', {
-    DB_HOST: process.env.DB_HOST,
-    DB_USER: process.env.DB_USER,
-    DB_NAME: process.env.DB_NAME,
-    DB_PORT: process.env.DB_PORT
-});
-
-export const pool = createPool({
+export const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
+    user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
-    port: process.env.DB_PORT || 3306,
-    database: process.env.DB_NAME || 'db_consumo_hidrico'
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'db_consumo_hidrico',
+    // Configuración para Render.com (usa SSL si está disponible)
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
 });
 
-console.log('📦 Pool de conexiones a MySQL creado.');
+console.log('📦 Pool de conexiones a PostgreSQL creado.');

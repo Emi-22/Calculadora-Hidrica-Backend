@@ -30,35 +30,33 @@ router.post('/respuestas', protegerRuta, async (req, res) => {
         // Usamos una transacción para asegurar que todas las operaciones (borrar y luego insertar)
         // se completen exitosamente. Si algo falla, se revierte todo.
 
-        connection = await pool.getConnection(); // Obtenemos una conexión del pool
-        await connection.beginTransaction(); // Iniciamos la transacción
+        connection = await pool.connect(); // Obtenemos una conexión del pool
+        await connection.query('BEGIN'); // Iniciamos la transacción
 
         // --- Práctica 3: Limpiar respuestas antiguas ---
         // Esto permite al usuario "volver a tomar" el cuestionario.
         // Borramos solo las respuestas de este usuario.
         // (Una lógica más avanzada podría borrar solo respuestas de las preguntas enviadas)
-        await connection.query('DELETE FROM respuestas_usuario WHERE id_usuario = ?', [idUsuario]);
+        await connection.query('DELETE FROM respuestas_usuario WHERE id_usuario = $1', [idUsuario]);
 
         // --- Práctica 4: Insertar Múltiples Filas Eficientemente ---
-
-        // Convertimos el array [3, 5, 8] en un array de arrays: [[idUsuario, 3], [idUsuario, 5], [idUsuario, 8]]
-        const valoresParaInsertar = opciones.map(idOpcion => [idUsuario, idOpcion]);
-
-        // Creamos la consulta para inserción múltiple
-        const sql = 'INSERT INTO respuestas_usuario (id_usuario, id_opcion) VALUES ?';
-
-        // Ejecutamos la consulta con los valores
-        await connection.query(sql, [valoresParaInsertar]);
+        // En PostgreSQL usamos un loop o múltiples INSERTs
+        for (const idOpcion of opciones) {
+            await connection.query(
+                'INSERT INTO respuestas_usuario (id_usuario, id_opcion) VALUES ($1, $2)',
+                [idUsuario, idOpcion]
+            );
+        }
 
         // Si todo salió bien, confirmamos la transacción
-        await connection.commit();
+        await connection.query('COMMIT');
 
         res.status(201).json({ message: 'Respuestas guardadas exitosamente.' });
 
     } catch (error) {
         // Si algo falló, revertimos la transacción
         if (connection) {
-            await connection.rollback();
+            await connection.query('ROLLBACK');
         }
         console.error('Error al guardar respuestas:', error);
         res.status(500).json({
@@ -84,7 +82,7 @@ export default router;
 router.get('/respuestas/estadisticas', protegerRuta, requerirRol('admin', 'administrador'), async (req, res) => {
     try {
         // Obtener estadísticas por pregunta y opción
-        const [rows] = await pool.query(`
+        const rows = await pool.query(`
             SELECT 
                 p.id           AS id_pregunta,
                 p.codigo       AS codigo_pregunta,
@@ -101,14 +99,14 @@ router.get('/respuestas/estadisticas', protegerRuta, requerirRol('admin', 'admin
 
         // Obtener conteo de usuarios únicos que completaron la encuesta
         // Un usuario completó la encuesta si tiene al menos una respuesta
-        const [usuariosCompletaron] = await pool.query(`
+        const usuariosCompletaron = await pool.query(`
             SELECT COUNT(DISTINCT id_usuario) AS total_usuarios
             FROM respuestas_usuario
         `);
 
         res.json({
-            estadisticas: rows,
-            totalUsuariosCompletaron: usuariosCompletaron[0]?.total_usuarios || 0
+            estadisticas: rows.rows,
+            totalUsuariosCompletaron: usuariosCompletaron.rows[0]?.total_usuarios || 0
         });
     } catch (error) {
         res.status(500).json({

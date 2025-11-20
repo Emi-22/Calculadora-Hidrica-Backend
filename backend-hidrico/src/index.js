@@ -1,7 +1,4 @@
 // src/index.js
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { config } from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { pool } from './db.js'; // Importamos nuestro pool de conexión
@@ -11,18 +8,9 @@ import respuestasRoutes from './routes/respuestas.routes.js'; // Importamos las 
 import consumoRoutes from './routes/consumo.routes.js'; // Importamos las rutas de consumo
 import usuariosRoutes from './routes/usuarios.routes.js'; // Rutas de administración de usuarios
 
-
-
-// Get current file path and directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Load .env from the project root
-config({ path: join(__dirname, '../.env') });
-
 // --- Configuración Inicial ---
 const app = express();
-const PORT = process.env.API_PORT || 5000;
+const PORT = process.env.PORT || process.env.API_PORT || 5000;
 
 // --- Middlewares Esenciales ---
 // 1. Permite peticiones de otros dominios (tu front-end)
@@ -41,10 +29,10 @@ app.get('/', (req, res) => {
 app.get('/ping', async (req, res) => {
     try {
         // Saca una conexión del pool y ejecuta una consulta simple
-        const [result] = await pool.query('SELECT 1 + 1 AS solucion');
+        const result = await pool.query('SELECT 1 + 1 AS solucion');
         res.json({
             message: "Conexión a la BD exitosa ✅",
-            resultado: result[0].solucion
+            resultado: result.rows[0].solucion
         });
     } catch (error) {
         res.status(500).json({
@@ -62,6 +50,6 @@ app.use('/api', consumoRoutes);
 app.use('/api', usuariosRoutes);
 
 // --- Iniciar el Servidor ---
-app.listen(PORT, () => {
-    console.log(`📡 Servidor escuchando en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`📡 Servidor escuchando en el puerto ${PORT}`);
 });

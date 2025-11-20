@@ -34,16 +34,19 @@ router.get('/usuarios', protegerRuta, requerirRol('admin'), async (req, res) => 
 
         const filtros = [];
         const valores = [];
+        let paramIndex = 1;
 
         if (q && String(q).trim() !== '') {
-            filtros.push('(nombre LIKE ? OR email LIKE ?)');
+            filtros.push(`(nombre LIKE $${paramIndex} OR email LIKE $${paramIndex + 1})`);
             const like = `%${String(q).trim()}%`;
             valores.push(like, like);
+            paramIndex += 2;
         }
 
         if (rol && (rol === 'admin' || rol === 'usuario')) {
-            filtros.push('rol = ?');
+            filtros.push(`rol = $${paramIndex}`);
             valores.push(rol);
+            paramIndex += 1;
         }
 
         const whereClause = filtros.length > 0 ? `WHERE ${filtros.join(' AND ')}` : '';
@@ -53,15 +56,12 @@ router.get('/usuarios', protegerRuta, requerirRol('admin'), async (req, res) => 
         const offset = (pageNum - 1) * limitNum;
 
         // Total para paginación
-        const [countRows] = await pool.query(
-            `SELECT COUNT(*) AS total FROM usuarios ${whereClause}`,
-            valores
-        );
-        const total = countRows[0]?.total ?? 0;
+        const countQuery = `SELECT COUNT(*) AS total FROM usuarios ${whereClause}`;
+        const countRows = await pool.query(countQuery, valores);
+        const total = parseInt(countRows.rows[0]?.total ?? 0, 10);
 
         // Datos paginados
-        const [usuarios] = await pool.query(
-            `
+        const usuariosQuery = `
             SELECT 
                 id,
                 nombre,
@@ -73,13 +73,13 @@ router.get('/usuarios', protegerRuta, requerirRol('admin'), async (req, res) => 
             FROM usuarios
             ${whereClause}
             ORDER BY fecha_registro DESC
-            LIMIT ? OFFSET ?
-            `,
-            [...valores, limitNum, offset]
-        );
+            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+        `;
+        const usuariosParams = [...valores, limitNum, offset];
+        const usuarios = await pool.query(usuariosQuery, usuariosParams);
 
         res.json({
-            data: usuarios,
+            data: usuarios.rows,
             pagination: {
                 total,
                 page: pageNum,
@@ -101,17 +101,17 @@ router.get('/usuarios', protegerRuta, requerirRol('admin'), async (req, res) => 
  */
 router.get('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, res) => {
     try {
-        const [rows] = await pool.query(
+        const rows = await pool.query(
             `
             SELECT 
                 id, nombre, email, rol, sexo, nivel_educativo, fecha_registro, fecha_actualizacion
             FROM usuarios
-            WHERE id = ?
+            WHERE id = $1
             `,
             [req.params.id]
         );
-        if (rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
-        res.json(rows[0]);
+        if (rows.rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
+        res.json(rows.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener usuario', error: error.message });
     }
@@ -146,20 +146,20 @@ router.post('/usuarios', protegerRuta, requerirRol('admin'), async (req, res) =>
 
     try {
         // Unicidad de email
-        const [dupes] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email]);
-        if (dupes.length > 0) {
+        const dupes = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
+        if (dupes.rows.length > 0) {
             return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const [result] = await pool.query(
+        const result = await pool.query(
             `INSERT INTO usuarios (nombre, email, password_hash, sexo, nivel_educativo, rol)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
             [nombre, email, passwordHash, sexoNorm, nivelNorm, rolNorm]
         );
 
         res.status(201).json({
-            id: result.insertId,
+            id: result.rows[0].id,
             nombre,
             email,
             sexo: sexoNorm,
@@ -183,25 +183,25 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
     const values = [];
 
     if (typeof nombre === 'string') {
-        sets.push('nombre = ?');
+        sets.push('nombre = $' + (values.length + 1));
         values.push(nombre);
     }
     if (typeof email === 'string') {
         // verificar email duplicado
         try {
-            const [dupes] = await pool.query('SELECT id FROM usuarios WHERE email = ? AND id <> ?', [email, req.params.id]);
-            if (dupes.length > 0) {
+            const dupes = await pool.query('SELECT id FROM usuarios WHERE email = $1 AND id <> $2', [email, req.params.id]);
+            if (dupes.rows.length > 0) {
                 return res.status(409).json({ message: 'El correo electrónico ya está registrado por otro usuario.' });
             }
         } catch (error) {
             return res.status(500).json({ message: 'Error al validar email', error: error.message });
         }
-        sets.push('email = ?');
+        sets.push('email = $' + (values.length + 1));
         values.push(email);
     }
     if (typeof password === 'string' && password.length > 0) {
         const hash = await bcrypt.hash(password, 10);
-        sets.push('password_hash = ?');
+        sets.push('password_hash = $' + (values.length + 1));
         values.push(hash);
     }
     if (typeof sexo === 'string') {
@@ -209,7 +209,7 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
         if (!SEXO_PERMITIDOS.has(sexoNorm)) {
             return res.status(400).json({ message: 'Valor de "sexo" inválido.', permitidos: Array.from(SEXO_PERMITIDOS) });
         }
-        sets.push('sexo = ?');
+        sets.push('sexo = $' + (values.length + 1));
         values.push(sexoNorm);
     }
     if (typeof nivel_educativo === 'string') {
@@ -217,7 +217,7 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
         if (!NIVEL_EDUCATIVO_PERMITIDOS.has(nivelNorm)) {
             return res.status(400).json({ message: 'Valor de "nivel_educativo" inválido.', permitidos: Array.from(NIVEL_EDUCATIVO_PERMITIDOS) });
         }
-        sets.push('nivel_educativo = ?');
+        sets.push('nivel_educativo = $' + (values.length + 1));
         values.push(nivelNorm);
     }
     if (typeof rol === 'string') {
@@ -225,7 +225,7 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
         if (!ROLES_PERMITIDOS.has(rolNorm)) {
             return res.status(400).json({ message: 'Valor de "rol" inválido.', permitidos: Array.from(ROLES_PERMITIDOS) });
         }
-        sets.push('rol = ?');
+        sets.push('rol = $' + (values.length + 1));
         values.push(rolNorm);
     }
 
@@ -234,10 +234,10 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
     }
 
     try {
-        const sql = `UPDATE usuarios SET ${sets.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = ?`;
+        const sql = `UPDATE usuarios SET ${sets.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = $${values.length + 1}`;
         values.push(req.params.id);
-        const [result] = await pool.query(sql, values);
-        if (result.affectedRows === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
+        const result = await pool.query(sql, values);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
         res.json({ message: 'Usuario actualizado correctamente.' });
     } catch (error) {
         res.status(500).json({ message: 'Error al actualizar usuario', error: error.message });
@@ -250,8 +250,8 @@ router.patch('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, re
  */
 router.delete('/usuarios/:id', protegerRuta, requerirRol('admin'), async (req, res) => {
     try {
-        const [result] = await pool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
-        if (result.affectedRows === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
+        const result = await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
         res.json({ message: 'Usuario eliminado correctamente.' });
     } catch (error) {
         res.status(500).json({ message: 'Error al eliminar usuario', error: error.message });
