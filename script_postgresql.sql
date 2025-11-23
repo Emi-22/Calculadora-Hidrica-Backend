@@ -6,12 +6,16 @@
 
 -- 1. CREACIÓN DE LA BASE DE DATOS
 -- Nota: En PostgreSQL, normalmente se crea la base de datos desde psql o pgAdmin
--- Ejecuta esto como superusuario: CREATE DATABASE db_consumo_hidrico;
--- O usa: createdb db_consumo_hidrico
+-- Ejecuta esto como superusuario: CREATE DATABASE db_consumo_hidrico ENCODING 'UTF8' LC_COLLATE='es_ES.UTF-8' LC_CTYPE='es_ES.UTF-8';
+-- O usa: createdb -E UTF8 -l es_ES.UTF-8 db_consumo_hidrico
+-- IMPORTANTE: Asegúrate de que la base de datos se cree con codificación UTF-8
 
 -- 2. CONECTARSE A LA BASE DE DATOS
 -- \c db_consumo_hidrico (en psql)
 -- O especifica la base de datos en la conexión
+
+-- 3. CONFIGURAR CODIFICACIÓN DE LA SESIÓN (ejecutar después de conectarse)
+-- SET client_encoding = 'UTF8';
 
 -- -----------------------------------------------------
 -- Tabla: `usuarios`

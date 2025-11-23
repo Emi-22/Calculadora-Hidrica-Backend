@@ -42,7 +42,8 @@ router.get('/preguntas', async (req, res) => {
             }
         });
         
-        // 5. Enviamos el JSON formateado
+        // 5. Enviamos el JSON formateado con charset UTF-8
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.json(preguntasFormateadas);
 
     } catch (error) {

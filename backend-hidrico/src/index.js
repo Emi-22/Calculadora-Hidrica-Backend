@@ -16,7 +16,13 @@ const PORT = process.env.PORT || process.env.API_PORT || 5000;
 // 1. Permite peticiones de otros dominios (tu front-end)
 app.use(cors()); 
 // 2. Permite al servidor entender JSON enviado desde el front-end
-app.use(express.json()); 
+app.use(express.json());
+// 3. Configurar charset UTF-8 para todas las respuestas
+app.use((req, res, next) => {
+    res.charset = 'utf-8';
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    next();
+}); 
 
 // --- Rutas (Endpoints) ---
 

@@ -10,7 +10,9 @@ export const pool = new Pool({
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'db_consumo_hidrico',
     // Configuración para Render.com (usa SSL si está disponible)
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    // Configurar codificación UTF-8 explícitamente
+    client_encoding: 'UTF8'
 });
 
 console.log('📦 Pool de conexiones a PostgreSQL creado.');
